@@ -31,9 +31,9 @@ void HokuyoSpelPublisher::publishTf(
   const std::string& child_frame_id,
   const spnet::OdomPacket& pkt)
 {
-  geometry_msgs::msg::TransformStamped tf;
+  geometry_msgs::TransformStamped tf;
 
-  tf.header.stamp = rclcpp::Time(stamp);
+  tf.header.stamp = ros::Time(static_cast<uint32_t>(stamp / 1000000000ULL), static_cast<uint32_t>(stamp % 1000000000ULL));
   tf.header.frame_id = frame_id;
   tf.child_frame_id = child_frame_id;
   tf.transform.translation.x = pkt.x;
@@ -48,14 +48,14 @@ void HokuyoSpelPublisher::publishTf(
 }
 
 void HokuyoSpelPublisher::publishOdom(
-  const rclcpp::Publisher<nav_msgs::msg::Odometry>::SharedPtr& pub,
+  const ros::Publisher& pub,
   uint64_t stamp,
   const std::string& frame_id,
   const std::string& child_frame_id,
   const spnet::OdomPacket& pkt)
 {
-  nav_msgs::msg::Odometry odom;
-  odom.header.stamp = rclcpp::Time(stamp);
+  nav_msgs::Odometry odom;
+  odom.header.stamp = ros::Time(static_cast<uint32_t>(stamp / 1000000000ULL), static_cast<uint32_t>(stamp % 1000000000ULL));
   odom.header.frame_id = frame_id;
   odom.child_frame_id  = child_frame_id;
   odom.pose.pose.position.x = pkt.x;
@@ -75,21 +75,21 @@ void HokuyoSpelPublisher::publishOdom(
     odom.pose.covariance[i] = pkt.pos_cov[i];
     odom.twist.covariance[i] = pkt.vel_cov[i];
   }
-  pub->publish(odom);
+  pub.publish(odom);
 }
 
 void HokuyoSpelPublisher::publishHokuyoCloud2(
-  const rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr& pub,
+  const ros::Publisher& pub,
   uint64_t stamp,
   const std::string& frame_id,
   const spnet::PointCloudPacketHeader& hdr,
   const spnet::PointXYZIT* points)
 {
-  sensor_msgs::msg::PointCloud2 cloud;
+  sensor_msgs::PointCloud2 cloud;
 
   const uint32_t num_points = hdr.num_points;
 
-  cloud.header.stamp = rclcpp::Time(stamp);
+  cloud.header.stamp = ros::Time(static_cast<uint32_t>(stamp / 1000000000ULL), static_cast<uint32_t>(stamp % 1000000000ULL));
   cloud.header.frame_id = frame_id;
   cloud.height = 1;
   cloud.width  = num_points;
@@ -98,32 +98,32 @@ void HokuyoSpelPublisher::publishHokuyoCloud2(
 
   cloud.fields[0].name     = "x";
   cloud.fields[0].offset   = 0;
-  cloud.fields[0].datatype = sensor_msgs::msg::PointField::FLOAT32;
+  cloud.fields[0].datatype = sensor_msgs::PointField::FLOAT32;
   cloud.fields[0].count    = 1;
 
   cloud.fields[1].name     = "y";
   cloud.fields[1].offset   = 4;
-  cloud.fields[1].datatype = sensor_msgs::msg::PointField::FLOAT32;
+  cloud.fields[1].datatype = sensor_msgs::PointField::FLOAT32;
   cloud.fields[1].count    = 1;
 
   cloud.fields[2].name     = "z";
   cloud.fields[2].offset   = 8;
-  cloud.fields[2].datatype = sensor_msgs::msg::PointField::FLOAT32;
+  cloud.fields[2].datatype = sensor_msgs::PointField::FLOAT32;
   cloud.fields[2].count    = 1;
 
   cloud.fields[3].name     = "intensity";
   cloud.fields[3].offset   = 12;
-  cloud.fields[3].datatype = sensor_msgs::msg::PointField::FLOAT32;
+  cloud.fields[3].datatype = sensor_msgs::PointField::FLOAT32;
   cloud.fields[3].count    = 1;
 
   cloud.fields[4].name     = "sec";
   cloud.fields[4].offset   = 16;
-  cloud.fields[4].datatype = sensor_msgs::msg::PointField::UINT32;
+  cloud.fields[4].datatype = sensor_msgs::PointField::UINT32;
   cloud.fields[4].count    = 1;
 
   cloud.fields[5].name     = "nsec";
   cloud.fields[5].offset   = 20;
-  cloud.fields[5].datatype = sensor_msgs::msg::PointField::UINT32;
+  cloud.fields[5].datatype = sensor_msgs::PointField::UINT32;
   cloud.fields[5].count    = 1;
 
   cloud.is_bigendian = false;
@@ -134,18 +134,18 @@ void HokuyoSpelPublisher::publishHokuyoCloud2(
   cloud.data.resize(static_cast<size_t>(cloud.row_step) * cloud.height);
   std::memcpy(cloud.data.data(), points,
   static_cast<size_t>(num_points) * sizeof(spnet::PointXYZIT));
-  pub->publish(cloud);
+  pub.publish(cloud);
 }
 
 void HokuyoSpelPublisher::publishImu(
-  const rclcpp::Publisher<sensor_msgs::msg::Imu>::SharedPtr& pub,
+  const ros::Publisher& pub,
   uint64_t stamp,
   const std::string& frame_id,
   const spnet::ImuPacket& pkt)
 {
-  sensor_msgs::msg::Imu imu;
+  sensor_msgs::Imu imu;
 
-  imu.header.stamp = rclcpp::Time(stamp);
+  imu.header.stamp = ros::Time(static_cast<uint32_t>(stamp / 1000000000ULL), static_cast<uint32_t>(stamp % 1000000000ULL));
   imu.header.frame_id = frame_id;
 
   // orientation
@@ -171,17 +171,17 @@ void HokuyoSpelPublisher::publishImu(
     imu.linear_acceleration_covariance[i] = pkt.lin_acc_cov[i];
   }
 
-  pub->publish(imu);
+  pub.publish(imu);
 }
 
 void HokuyoSpelPublisher::publishNavSatFix(
-  const rclcpp::Publisher<sensor_msgs::msg::NavSatFix>::SharedPtr& pub,
+  const ros::Publisher& pub,
   uint64_t stamp,
   const std::string& frame_id,
   const spnet::NavSatFixPacket& pkt)
 {
-  sensor_msgs::msg::NavSatFix msg;
-  msg.header.stamp = rclcpp::Time(stamp);
+  sensor_msgs::NavSatFix msg;
+  msg.header.stamp = ros::Time(static_cast<uint32_t>(stamp / 1000000000ULL), static_cast<uint32_t>(stamp % 1000000000ULL));
   msg.header.frame_id = frame_id;
   msg.latitude  = pkt.latitude;
   msg.longitude = pkt.longitude;
@@ -192,18 +192,18 @@ void HokuyoSpelPublisher::publishNavSatFix(
   msg.status.status  = pkt.status_status;
   msg.status.service = pkt.status_service;
   msg.position_covariance_type = pkt.position_covariance_type;
-  pub->publish(msg);
+  pub.publish(msg);
 }
 
 void HokuyoSpelPublisher::publishGpgga(
-  const rclcpp::Publisher<nmea_msgs::msg::Gpgga>::SharedPtr& pub,
+  const ros::Publisher& pub,
   uint64_t stamp,
   const std::string& frame_id,
   const spnet::GpggaPacket& pkt)
 {
-  nmea_msgs::msg::Gpgga msg;
+  nmea_msgs::Gpgga msg;
 
-  msg.header.stamp = rclcpp::Time(stamp);
+  msg.header.stamp = ros::Time(static_cast<uint32_t>(stamp / 1000000000ULL), static_cast<uint32_t>(stamp % 1000000000ULL));
   msg.header.frame_id = frame_id;
 
   msg.message_id = std::string(pkt.message_id);
@@ -227,18 +227,18 @@ void HokuyoSpelPublisher::publishGpgga(
   msg.diff_age = pkt.diff_age;
   msg.station_id = std::string(pkt.station_id);
 
-  pub->publish(msg);
+  pub.publish(msg);
 }
 
 void HokuyoSpelPublisher::publishGprmc(
-  const rclcpp::Publisher<nmea_msgs::msg::Gprmc>::SharedPtr& pub,
+  const ros::Publisher& pub,
   uint64_t stamp,
   const std::string& frame_id,
   const spnet::GprmcPacket& pkt)
 {
-  nmea_msgs::msg::Gprmc msg;
+  nmea_msgs::Gprmc msg;
 
-  msg.header.stamp = rclcpp::Time(stamp);
+  msg.header.stamp = ros::Time(static_cast<uint32_t>(stamp / 1000000000ULL), static_cast<uint32_t>(stamp % 1000000000ULL));
   msg.header.frame_id = frame_id;
 
   msg.message_id = std::string(
@@ -270,17 +270,17 @@ void HokuyoSpelPublisher::publishGprmc(
   msg.mag_var_direction = (pkt.mag_var_dir == '\0') ? "" : std::string(1, pkt.mag_var_dir);
   msg.mode_indicator    = (pkt.mode == '\0') ? "" : std::string(1, pkt.mode);
 
-  pub->publish(msg);
+  pub.publish(msg);
 }
 
 void HokuyoSpelPublisher::publishGpzda(
-  const rclcpp::Publisher<nmea_msgs::msg::Gpzda>::SharedPtr& pub,
+  const ros::Publisher& pub,
   uint64_t stamp,
   const std::string& frame_id,
   const spnet::GpzdaPacket& pkt)
 {
-  nmea_msgs::msg::Gpzda msg;
-  msg.header.stamp = rclcpp::Time(stamp);
+  nmea_msgs::Gpzda msg;
+  msg.header.stamp = ros::Time(static_cast<uint32_t>(stamp / 1000000000ULL), static_cast<uint32_t>(stamp % 1000000000ULL));
   msg.header.frame_id = frame_id;
   msg.message_id = std::string(pkt.message_id, strnlen(pkt.message_id, sizeof(pkt.message_id)));
   msg.utc_seconds = pkt.utc_seconds;
@@ -290,24 +290,24 @@ void HokuyoSpelPublisher::publishGpzda(
   msg.hour_offset_gmt = pkt.hour_offset_gmt;
   msg.minute_offset_gmt = pkt.minute_offset_gmt;
 
-  pub->publish(msg);
+  pub.publish(msg);
 }
 
 void HokuyoSpelPublisher::publishString(
-  const rclcpp::Publisher<std_msgs::msg::String>::SharedPtr& pub,
+  const ros::Publisher& pub,
   const std::string& str)
 {
-  std_msgs::msg::String msg;
+  std_msgs::String msg;
   msg.data = str;
-  pub->publish(msg);
+  pub.publish(msg);
 }
 
 static inline void AddKV(
-  diagnostic_msgs::msg::DiagnosticStatus& status,
+  diagnostic_msgs::DiagnosticStatus& status,
   const std::string& key,
   const std::string& value)
 {
-  diagnostic_msgs::msg::KeyValue kv;
+  diagnostic_msgs::KeyValue kv;
   kv.key = key;
   kv.value = value;
   status.values.push_back(kv);
@@ -332,25 +332,23 @@ static inline std::string Ipv4U32ToString(uint32_t ip_net_order) {
 
 // stamp_ns: UNIX epoch nanoseconds (same style as your other publishers)
 void HokuyoSpelPublisher::publishDiagnostics(
-  const rclcpp::Publisher<diagnostic_msgs::msg::DiagnosticArray>::SharedPtr& pub,
+  const ros::Publisher& pub,
   uint64_t stamp,
   const spnet::DiagnosticPacket& pkt)
 {
-  diagnostic_msgs::msg::DiagnosticArray array;
+  diagnostic_msgs::DiagnosticArray array;
 
   // header stamp from ns
-  array.header.stamp.sec =
-    static_cast<int32_t>(stamp / 1000000000ULL);
-  array.header.stamp.nanosec =
-    static_cast<uint32_t>(stamp % 1000000000ULL);
+  array.header.stamp = ros::Time(static_cast<uint32_t>(stamp / 1000000000ULL),
+                                 static_cast<uint32_t>(stamp % 1000000000ULL));
 
-  diagnostic_msgs::msg::DiagnosticStatus status;
+  diagnostic_msgs::DiagnosticStatus status;
   status.name = "spel_device";
   status.hardware_id = Fixed8ToString(pkt.device_id);
 
   status.level = (pkt.device_status == 0)
-    ? diagnostic_msgs::msg::DiagnosticStatus::OK
-    : diagnostic_msgs::msg::DiagnosticStatus::WARN;
+    ? diagnostic_msgs::DiagnosticStatus::OK
+    : diagnostic_msgs::DiagnosticStatus::WARN;
   status.message = (pkt.device_status == 0) ? "OK" : "WARN";
 
   // ---- Key-Value entries ----
@@ -383,7 +381,7 @@ void HokuyoSpelPublisher::publishDiagnostics(
   AddKV(status, "gnss_type",      std::to_string(static_cast<int>(pkt.gnss_type)));
 
   array.status.push_back(status);
-  pub->publish(array);
+  pub.publish(array);
 }
 
 } // namespace hsp

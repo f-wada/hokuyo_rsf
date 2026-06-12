@@ -25,7 +25,7 @@ PayloadConverter::~PayloadConverter() {
 }
 
 void PayloadConverter::odomToPayload(
-  const nav_msgs::msg::Odometry& odom,
+  const nav_msgs::Odometry& odom,
   std::vector<uint8_t>& pl)
 {
   spnet::OdomPacket pkt{};
@@ -52,7 +52,7 @@ void PayloadConverter::odomToPayload(
 }
 
 void PayloadConverter::hokuyoCloud2ToPayload(
-  const sensor_msgs::msg::PointCloud2& cloud,
+  const sensor_msgs::PointCloud2& cloud,
   std::vector<uint8_t>& pl)
 {
   const uint32_t num_points = cloud.width * cloud.height;
@@ -106,7 +106,7 @@ void PayloadConverter::hokuyoCloud2ToPayload(
 }
 
 void PayloadConverter::imuToPayload(
-  const sensor_msgs::msg::Imu& imu,
+  const sensor_msgs::Imu& imu,
   std::vector<uint8_t>& pl)
 {
   spnet::ImuPacket pkt{};
@@ -139,7 +139,7 @@ void PayloadConverter::imuToPayload(
 }
 
 void PayloadConverter::navSatFixToPayload(
-  const sensor_msgs::msg::NavSatFix& msg,
+  const sensor_msgs::NavSatFix& msg,
   std::vector<uint8_t>& pl)
 {
   spnet::NavSatFixPacket pkt{};
@@ -158,7 +158,7 @@ void PayloadConverter::navSatFixToPayload(
 }
 
 void PayloadConverter::gpggaToPayload(
-  const nmea_msgs::msg::Gpgga& msg,
+  const nmea_msgs::Gpgga& msg,
   std::vector<uint8_t>& pl)
 {
   spnet::GpggaPacket pkt{};
@@ -191,7 +191,7 @@ void PayloadConverter::gpggaToPayload(
 }
 
 void PayloadConverter::gprmcToPayload(
-  const nmea_msgs::msg::Gprmc& msg,
+  const nmea_msgs::Gprmc& msg,
   std::vector<uint8_t>& pl)
 {
   spnet::GprmcPacket pkt{};
@@ -227,7 +227,7 @@ void PayloadConverter::gprmcToPayload(
 }
 
 void PayloadConverter::gpzdaToPayload(
-  const nmea_msgs::msg::Gpzda& gpzda,
+  const nmea_msgs::Gpzda& gpzda,
   std::vector<uint8_t>& pl)
 {
   spnet::GpzdaPacket pkt{};
@@ -247,7 +247,7 @@ void PayloadConverter::gpzdaToPayload(
 }
 
 void PayloadConverter::stringToPayload(
-  const std_msgs::msg::String& msg,
+  const std_msgs::String& msg,
   std::vector<uint8_t>& pl)
 {
   const std::string& str = msg.data;
@@ -258,7 +258,7 @@ void PayloadConverter::stringToPayload(
 }
 
 void PayloadConverter::diagnosticsToPayload(
-  const diagnostic_msgs::msg::DiagnosticArray& diag,
+  const diagnostic_msgs::DiagnosticArray& diag,
   std::vector<uint8_t>& pl,
   const std::string& target_status_name)
 {
@@ -267,7 +267,7 @@ void PayloadConverter::diagnosticsToPayload(
   std::memset(&pkt, 0, sizeof(pkt));
 
   // --- 1) find target status ---
-  const diagnostic_msgs::msg::DiagnosticStatus* st_ptr = nullptr;
+  const diagnostic_msgs::DiagnosticStatus* st_ptr = nullptr;
   for (const auto& st : diag.status) {
     if (st.name == target_status_name) {
       st_ptr = &st;

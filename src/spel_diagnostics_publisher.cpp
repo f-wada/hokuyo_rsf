@@ -12,39 +12,35 @@
  * without written permission from LOCT Co., Ltd.
  */
 
-#include <rclcpp/rclcpp.hpp>
-#include <diagnostic_msgs/msg/diagnostic_array.hpp>
-#include <diagnostic_msgs/msg/diagnostic_status.hpp>
-#include <diagnostic_msgs/msg/key_value.hpp>
+#include <ros/ros.h>
+#include <diagnostic_msgs/DiagnosticArray.h>
+#include <diagnostic_msgs/DiagnosticStatus.h>
+#include <diagnostic_msgs/KeyValue.h>
 
-#include <chrono>
 #include <string>
 
-using namespace std::chrono_literals;
-
-class SpelDiagnosticsPublisher : public rclcpp::Node {
+class SpelDiagnosticsPublisher {
  public:
   SpelDiagnosticsPublisher()
-  : Node("spel_diagnostics_publisher")
+  : nh_(), pnh_("~")
   {
-    pub_ = this->create_publisher<diagnostic_msgs::msg::DiagnosticArray>(
-      "/diagnostics", 10);
+    std::string topic;
+    pnh_.param<std::string>("diagnostics_topic", topic, "/diagnostics");
+    pub_ = nh_.advertise<diagnostic_msgs::DiagnosticArray>(topic, 10);
+    timer_ = nh_.createTimer(ros::Duration(1.0), &SpelDiagnosticsPublisher::onTimer, this);
 
-    timer_ = this->create_wall_timer(
-      1s, std::bind(&SpelDiagnosticsPublisher::onTimer, this));
-
-    RCLCPP_INFO(this->get_logger(), "SPEL diagnostics publisher started (1 Hz).");
+    ROS_INFO("SPEL diagnostics publisher started (1 Hz).");
   }
 
  private:
-  void onTimer() {
-    diagnostic_msgs::msg::DiagnosticArray array;
-    array.header.stamp = this->now();
+  void onTimer(const ros::TimerEvent&) {
+    diagnostic_msgs::DiagnosticArray array;
+    array.header.stamp = ros::Time::now();
 
-    diagnostic_msgs::msg::DiagnosticStatus status;
+    diagnostic_msgs::DiagnosticStatus status;
     status.name = "spel_device";
     status.hardware_id = "H0000001";
-    status.level = diagnostic_msgs::msg::DiagnosticStatus::OK;
+    status.level = diagnostic_msgs::DiagnosticStatus::OK;
     status.message = "OK";
 
     // ---- Key-Value entries ----
@@ -63,27 +59,29 @@ class SpelDiagnosticsPublisher : public rclcpp::Node {
     add(status, "gnss_type", "0");
 
     array.status.push_back(status);
-    pub_->publish(array);
+    pub_.publish(array);
   }
 
   static void add(
-    diagnostic_msgs::msg::DiagnosticStatus& status,
+    diagnostic_msgs::DiagnosticStatus& status,
     const std::string& key,
     const std::string& value)
   {
-    diagnostic_msgs::msg::KeyValue kv;
+    diagnostic_msgs::KeyValue kv;
     kv.key = key;
     kv.value = value;
     status.values.push_back(kv);
   }
 
-  rclcpp::Publisher<diagnostic_msgs::msg::DiagnosticArray>::SharedPtr pub_;
-  rclcpp::TimerBase::SharedPtr timer_;
+  ros::NodeHandle nh_;
+  ros::NodeHandle pnh_;
+  ros::Publisher pub_;
+  ros::Timer timer_;
 };
 
 int main(int argc, char** argv) {
-  rclcpp::init(argc, argv);
-  rclcpp::spin(std::make_shared<SpelDiagnosticsPublisher>());
-  rclcpp::shutdown();
+  ros::init(argc, argv, "spel_diagnostics_publisher");
+  SpelDiagnosticsPublisher publisher;
+  ros::spin();
   return 0;
 }

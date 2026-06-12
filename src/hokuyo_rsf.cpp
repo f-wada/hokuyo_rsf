@@ -12,20 +12,21 @@
  * without written permission from LOCT Co., Ltd.
  */
 
-#include <rclcpp/rclcpp.hpp>
-#include <std_msgs/msg/empty.hpp>
-#include <std_msgs/msg/u_int8.hpp>
-#include <nav_msgs/msg/odometry.hpp>
-#include <sensor_msgs/msg/point_cloud2.hpp>
-#include <sensor_msgs/msg/imu.hpp>
-#include <sensor_msgs/msg/nav_sat_fix.hpp>
-#include <nmea_msgs/msg/gpgga.hpp>
-#include <nmea_msgs/msg/gprmc.hpp>
-#include <nmea_msgs/msg/gpzda.hpp>
+#include <ros/ros.h>
+#include <std_msgs/Empty.h>
+#include <std_msgs/UInt8.h>
+#include <std_msgs/String.h>
+#include <nav_msgs/Odometry.h>
+#include <sensor_msgs/PointCloud2.h>
+#include <sensor_msgs/Imu.h>
+#include <sensor_msgs/NavSatFix.h>
+#include <nmea_msgs/Gpgga.h>
+#include <nmea_msgs/Gprmc.h>
+#include <nmea_msgs/Gpzda.h>
 #include <tf2/LinearMath/Quaternion.h>
-#include <tf2_geometry_msgs/tf2_geometry_msgs.hpp>
+#include <tf2_geometry_msgs/tf2_geometry_msgs.h>
 #include <tf2_ros/transform_broadcaster.h>
-#include <diagnostic_msgs/msg/diagnostic_array.hpp>
+#include <diagnostic_msgs/DiagnosticArray.h>
 
 #include <unistd.h>
 #include <signal.h>
@@ -40,6 +41,7 @@
 #include <vector>
 #include <chrono>
 #include <cstdint>
+#include <memory>
 
 #include <hokuyo_spel_master/spnet_utils.hpp>
 #include <hokuyo_spel_master/payload_converter.hpp>
@@ -49,133 +51,100 @@
 // this should be a common file for master, lio, and spel_ros_node
 // #include <hokuyo_spel_master/lio_status.hpp>
 
-class HokuyoSpelRosNode : public rclcpp::Node {
+class HokuyoSpelRosNode {
  public:
-  HokuyoSpelRosNode():
-    Node("hokuyo_spel_ros_node")
+  HokuyoSpelRosNode()
+  : nh_(), pnh_("~")
   {
     is_set_last_imu_rate_odom_ = false;
+
     // Subscriber
-    rclcpp::QoS cmdQos(rclcpp::KeepLast(10));
-    cmdQos.reliable();
-    cmdQos.transient_local();
-
-    this->declare_parameter<std::string>("cmd_to_spel_topic", "/spel/cmd_to_spel");
     std::string cmdToSpelTopic;
-    this->get_parameter("cmd_to_spel_topic", cmdToSpelTopic);
-    cmdToSpelSub_ = this->create_subscription<std_msgs::msg::UInt8>(
-      cmdToSpelTopic, cmdQos,
-      std::bind(&HokuyoSpelRosNode::cmdToSpelCallback, this, std::placeholders::_1));
+    pnh_.param<std::string>("cmd_to_spel_topic", cmdToSpelTopic, "/spel/cmd_to_spel");
+    cmdToSpelSub_ = nh_.subscribe(cmdToSpelTopic, 10, &HokuyoSpelRosNode::cmdToSpelCallback, this);
 
-    this->declare_parameter<std::string>("ip_address_topic", "/spel/ip_address");
     std::string ipAddressTopic;
-    this->get_parameter("ip_address_topic", ipAddressTopic);
-    ipAddressSub_ = this->create_subscription<std_msgs::msg::String>(
-      ipAddressTopic, cmdQos,
-      std::bind(&HokuyoSpelRosNode::ipAddressCallback, this, std::placeholders::_1));
+    pnh_.param<std::string>("ip_address_topic", ipAddressTopic, "/spel/ip_address");
+    ipAddressSub_ = nh_.subscribe(ipAddressTopic, 10, &HokuyoSpelRosNode::ipAddressCallback, this);
 
-    // Publusher
-    this->declare_parameter<std::string>("nav_sat_fix_topic", "/spel/nav_sat_fix");
+    // Publisher
     std::string navSatFixTopic;
-    this->get_parameter("nav_sat_fix_topic", navSatFixTopic);
-    navSatFixPub_ = this->create_publisher<sensor_msgs::msg::NavSatFix>(navSatFixTopic, 100);
+    pnh_.param<std::string>("nav_sat_fix_topic", navSatFixTopic, "/spel/nav_sat_fix");
+    navSatFixPub_ = nh_.advertise<sensor_msgs::NavSatFix>(navSatFixTopic, 100);
 
-    this->declare_parameter<std::string>("gpgga_topic", "/spel/gpgga");
     std::string gpggaTopic;
-    this->get_parameter("gpgga_topic", gpggaTopic);
-    gpggaPub_ = this->create_publisher<nmea_msgs::msg::Gpgga>(gpggaTopic, 100);
+    pnh_.param<std::string>("gpgga_topic", gpggaTopic, "/spel/gpgga");
+    gpggaPub_ = nh_.advertise<nmea_msgs::Gpgga>(gpggaTopic, 100);
 
-    this->declare_parameter<std::string>("gprmc_topic", "/spel/gprmc");
     std::string gprmcTopic;
-    this->get_parameter("gprmc_topic", gprmcTopic);
-    gprmcPub_ = this->create_publisher<nmea_msgs::msg::Gprmc>(gprmcTopic, 100);
+    pnh_.param<std::string>("gprmc_topic", gprmcTopic, "/spel/gprmc");
+    gprmcPub_ = nh_.advertise<nmea_msgs::Gprmc>(gprmcTopic, 100);
 
-    this->declare_parameter<std::string>("gpzda_topic", "/spel/gpzda");
     std::string gpzdaTopic;
-    this->get_parameter("gpzda_topic", gpzdaTopic);
-    gpzdaPub_ = this->create_publisher<nmea_msgs::msg::Gpzda>(gpzdaTopic, 100);
+    pnh_.param<std::string>("gpzda_topic", gpzdaTopic, "/spel/gpzda");
+    gpzdaPub_ = nh_.advertise<nmea_msgs::Gpzda>(gpzdaTopic, 100);
 
-    this->declare_parameter<std::string>("hokuyo_cloud2_topic", "/spel/hokuyo_cloud2");
     std::string hokuyoCloud2Topic;
-    this->get_parameter("hokuyo_cloud2_topic", hokuyoCloud2Topic);
-    hokuyoCloud2Pub_ = this->create_publisher<sensor_msgs::msg::PointCloud2>(hokuyoCloud2Topic, 100);
+    pnh_.param<std::string>("hokuyo_cloud2_topic", hokuyoCloud2Topic, "/spel/hokuyo_cloud2");
+    hokuyoCloud2Pub_ = nh_.advertise<sensor_msgs::PointCloud2>(hokuyoCloud2Topic, 100);
 
-    this->declare_parameter<std::string>("imu_topic", "/spel/imu");
     std::string imuTopic;
-    this->get_parameter("imu_topic", imuTopic);
-    imuPub_ = this->create_publisher<sensor_msgs::msg::Imu>(imuTopic, 100);
+    pnh_.param<std::string>("imu_topic", imuTopic, "/spel/imu");
+    imuPub_ = nh_.advertise<sensor_msgs::Imu>(imuTopic, 100);
 
-    this->declare_parameter<std::string>("imu_rate_odom_topic", "/spel/imu_rate_odom");
     std::string imuRateOdomTopic;
-    this->get_parameter("imu_rate_odom_topic", imuRateOdomTopic);
-    imuRateOdomPub_ = this->create_publisher<nav_msgs::msg::Odometry>(imuRateOdomTopic, 100);
+    pnh_.param<std::string>("imu_rate_odom_topic", imuRateOdomTopic, "/spel/imu_rate_odom");
+    imuRateOdomPub_ = nh_.advertise<nav_msgs::Odometry>(imuRateOdomTopic, 100);
 
-    this->declare_parameter<std::string>("lidar_rate_odom_topic", "/spel/lidar_rate_odom");
     std::string lidarRateOdomTopic;
-    this->get_parameter("lidar_rate_odom_topic", lidarRateOdomTopic);
-    lidarRateOdomPub_ = this->create_publisher<nav_msgs::msg::Odometry>(lidarRateOdomTopic, 100);
+    pnh_.param<std::string>("lidar_rate_odom_topic", lidarRateOdomTopic, "/spel/lidar_rate_odom");
+    lidarRateOdomPub_ = nh_.advertise<nav_msgs::Odometry>(lidarRateOdomTopic, 100);
 
-    this->declare_parameter<std::string>("nav_sat_fix_switch_topic", "/spel/nav_sat_fix_switch");
     std::string navSatFixSwitchTopic;
-    this->get_parameter("nav_sat_fix_switch_topic", navSatFixSwitchTopic);
-    navSatFixSwitchPub_ = this->create_publisher<sensor_msgs::msg::NavSatFix>(navSatFixSwitchTopic, 100);
+    pnh_.param<std::string>("nav_sat_fix_switch_topic", navSatFixSwitchTopic, "/spel/nav_sat_fix_switch");
+    navSatFixSwitchPub_ = nh_.advertise<sensor_msgs::NavSatFix>(navSatFixSwitchTopic, 100);
 
-    this->declare_parameter<std::string>("utm_odom_topic", "/spel/utm_odom");
     std::string utmOdomTopic;
-    this->get_parameter("utm_odom_topic", utmOdomTopic);
-    utmOdomPub_ = this->create_publisher<nav_msgs::msg::Odometry>(utmOdomTopic, 100);
+    pnh_.param<std::string>("utm_odom_topic", utmOdomTopic, "/spel/utm_odom");
+    utmOdomPub_ = nh_.advertise<nav_msgs::Odometry>(utmOdomTopic, 100);
 
-    this->declare_parameter<std::string>("switch_odom_topic", "/spel/switch_odom");
     std::string switchOdomTopic;
-    this->get_parameter("switch_odom_topic", switchOdomTopic);
-    switchOdomPub_ = this->create_publisher<nav_msgs::msg::Odometry>(switchOdomTopic, 100);
+    pnh_.param<std::string>("switch_odom_topic", switchOdomTopic, "/spel/switch_odom");
+    switchOdomPub_ = nh_.advertise<nav_msgs::Odometry>(switchOdomTopic, 100);
 
-    this->declare_parameter<std::string>("switch_odom_state_topic", "/spel/switch_odom_state");
     std::string switchOdomStateTopic;
-    this->get_parameter("switch_odom_state_topic", switchOdomStateTopic);
-    switchOdomStatePub_ = this->create_publisher<std_msgs::msg::String>(switchOdomStateTopic, 100);
+    pnh_.param<std::string>("switch_odom_state_topic", switchOdomStateTopic, "/spel/switch_odom_state");
+    switchOdomStatePub_ = nh_.advertise<std_msgs::String>(switchOdomStateTopic, 100);
 
-    this->declare_parameter<std::string>("switch_odom_type_topic", "/spel/switch_odom_type");
     std::string switchOdomTypeTopic;
-    this->get_parameter("switch_odom_type_topic", switchOdomTypeTopic);
-    switchOdomTypePub_ = this->create_publisher<std_msgs::msg::String>(switchOdomTypeTopic, 100);
+    pnh_.param<std::string>("switch_odom_type_topic", switchOdomTypeTopic, "/spel/switch_odom_type");
+    switchOdomTypePub_ = nh_.advertise<std_msgs::String>(switchOdomTypeTopic, 100);
 
-    this->declare_parameter<std::string>("switch_fix_state_topic", "/spel/switch_fix_state");
     std::string switchFixStateTopic;
-    this->get_parameter("switch_fix_state_topic", switchFixStateTopic);
-    switchFixStatePub_ = this->create_publisher<std_msgs::msg::String>(switchFixStateTopic, 100);
+    pnh_.param<std::string>("switch_fix_state_topic", switchFixStateTopic, "/spel/switch_fix_state");
+    switchFixStatePub_ = nh_.advertise<std_msgs::String>(switchFixStateTopic, 100);
 
-    this->declare_parameter<std::string>("switch_fix_type_topic", "/spel/switch_fix_type");
     std::string switchFixTypeTopic;
-    this->get_parameter("switch_fix_type_topic", switchFixTypeTopic);
-    switchFixTypePub_ = this->create_publisher<std_msgs::msg::String>(switchFixTypeTopic, 100);
+    pnh_.param<std::string>("switch_fix_type_topic", switchFixTypeTopic, "/spel/switch_fix_type");
+    switchFixTypePub_ = nh_.advertise<std_msgs::String>(switchFixTypeTopic, 100);
 
-    this->declare_parameter<std::string>("diagnostics_topic", "/spel/diagnostics");
     std::string diagnosticsTopic;
-    this->get_parameter("diagnostics_topic", diagnosticsTopic);
-    diagnosticsPub_ = this->create_publisher<diagnostic_msgs::msg::DiagnosticArray>(diagnosticsTopic, 100);
+    pnh_.param<std::string>("diagnostics_topic", diagnosticsTopic, "/spel/diagnostics");
+    diagnosticsPub_ = nh_.advertise<diagnostic_msgs::DiagnosticArray>(diagnosticsTopic, 100);
 
     // Load SPEL parameters
-    this->declare_parameter<std::string>("spel_ip_address", "127.0.0.1");
-    this->declare_parameter<int>("spel_port", 10940);
-    this->get_parameter("spel_ip_address", spelIpAdress_);
-    this->get_parameter("spel_port", spelPort_);
+    pnh_.param<std::string>("spel_ip_address", spelIpAdress_, "127.0.0.1");
+    pnh_.param<int>("spel_port", spelPort_, 10940);
     std::cout << "IP Address: " << spelIpAdress_ << " Port: " << spelPort_ << std::endl;
 
-    this->declare_parameter<bool>("broadcast_tf", true);
-    this->declare_parameter<std::string>("odom_frame", "odom");
-    this->declare_parameter<std::string>("lidr_frame", "hokuyo3d");
-    this->declare_parameter<std::string>("imu_frame", "hokuyo3d_imu");
-    this->declare_parameter<std::string>("gnss_frame", "gnss");
-    this->declare_parameter<std::string>("utm_frame", "utm/utm_53Z");
-    this->get_parameter("broadcast_tf", broadcastTf_);
-    this->get_parameter("odom_frame", odomFrame_);
-    this->get_parameter("lidr_frame", lidarFrame_);
-    this->get_parameter("imu_frame", imuFrame_);
-    this->get_parameter("gnss_frame", gnssFrame_);
-    this->get_parameter("utm_frame", utmFrame_);
+    pnh_.param<bool>("broadcast_tf", broadcastTf_, true);
+    pnh_.param<std::string>("odom_frame", odomFrame_, "odom");
+    pnh_.param<std::string>("lidr_frame", lidarFrame_, "hokuyo3d");
+    pnh_.param<std::string>("imu_frame", imuFrame_, "hokuyo3d_imu");
+    pnh_.param<std::string>("gnss_frame", gnssFrame_, "gnss");
+    pnh_.param<std::string>("utm_frame", utmFrame_, "utm/utm_53Z");
     if (broadcastTf_) {
-      tfBroadcaster_ = std::make_shared<tf2_ros::TransformBroadcaster>(this);
+      tfBroadcaster_ = std::make_shared<tf2_ros::TransformBroadcaster>();
     }
 
     // Initialization for socket communication
@@ -184,7 +153,7 @@ class HokuyoSpelRosNode : public rclcpp::Node {
     clientThread_ = std::thread(&HokuyoSpelRosNode::spelClientLoop, this);
   }
 
-  ~HokuyoSpelRosNode() override {
+  ~HokuyoSpelRosNode() {
     HokuyoSpelRosNode::spelClientClose(sock_);
 
     clientRunning_.store(false);
@@ -194,39 +163,38 @@ class HokuyoSpelRosNode : public rclcpp::Node {
       clientThread_.join();
     }
   }
-
  private:
-  void cmdToSpelCallback(const std_msgs::msg::UInt8::SharedPtr msg) {
+  void cmdToSpelCallback(const std_msgs::UInt8::ConstPtr& msg) {
     std::lock_guard<std::mutex> lock(mutex_);
     cmdToSpel_ = *msg;
-    cmdToSpelStamp_ = this->now().nanoseconds();
+    cmdToSpelStamp_ = ros::Time::now().toNSec();
   }
 
-  void ipAddressCallback(const std_msgs::msg::String::SharedPtr msg) {
+  void ipAddressCallback(const std_msgs::String::ConstPtr& msg) {
     std::lock_guard<std::mutex> lock(mutex_);
     ipAddress_ = *msg;
-    ipAddressStamp_ = this->now().nanoseconds();
+    ipAddressStamp_ = ros::Time::now().toNSec();
   }
 
   void spelClientLoop() {
     std::atomic<bool> run(true);
 
-    while (rclcpp::ok()) {
+    while (ros::ok()) {
       std::thread rx(&HokuyoSpelRosNode::spelClientRxLoop, this, sock_, std::ref(run));
       std::thread tx(&HokuyoSpelRosNode::spelClientTxLoop, this, sock_, std::ref(run));
       rx.join();
       run.store(false);
       tx.join();
 
-      if (rclcpp::ok()) {
+      if (ros::ok()) {
         cleanupSocket();
         setupSocket();
         run.store(true);
-        RCLCPP_INFO(this->get_logger(), "Restart client loop.");
+        ROS_INFO( "Restart client loop.");
       }
     }
 
-    rclcpp::shutdown();
+    ros::shutdown();
   }
 
   void setupSocket() {
@@ -256,11 +224,11 @@ class HokuyoSpelRosNode : public rclcpp::Node {
     int sock,
     std::atomic<bool>& run)
   {
-    while (run.load() && rclcpp::ok()) {
+    while (run.load() && ros::ok()) {
       spnet::Header h{};
       std::vector<uint8_t> pl;
       if (!spnet::recvFrame(sock, h, pl)) {
-        RCLCPP_ERROR(this->get_logger(), "Failed to receive data from SPEL.");
+        ROS_ERROR( "Failed to receive data from SPEL.");
         break;
       }
 
@@ -269,16 +237,16 @@ class HokuyoSpelRosNode : public rclcpp::Node {
       if (type == spnet::MsgType::ERROR) {
         std::string str;
         hspParser_.parseStringPayload(pl, str);
-        RCLCPP_ERROR(this->get_logger(), "Got error from SPEL. %s", str.c_str());
+        ROS_ERROR( "Got error from SPEL. %s", str.c_str());
         break;
       
       } else if (type == spnet::MsgType::WARN) {
         std::string str;
         hspParser_.parseStringPayload(pl, str);
-        RCLCPP_WARN(this->get_logger(), "Got warning from SPEL. %s", str.c_str());
+        ROS_WARN( "Got warning from SPEL. %s", str.c_str());
 
       } else if (type == spnet::MsgType::ACK) {
-        RCLCPP_INFO(this->get_logger(), "Got ACK.");
+        ROS_INFO( "Got ACK.");
 
       } else if (type == spnet::MsgType::DATA) {
         const spnet::DataType datatype = spnet::toDataType(h.subtype);
@@ -289,7 +257,7 @@ class HokuyoSpelRosNode : public rclcpp::Node {
         if (datatype == spnet::DataType::NAV_SAT_FIX) {
           spnet::NavSatFixPacket pkt;
           if (!hspParser_.parseNavSatFixPayload(pl, pkt)) {
-            RCLCPP_ERROR(this->get_logger(), "Failed to parse NavSatFix payload.");
+            ROS_ERROR( "Failed to parse NavSatFix payload.");
             continue;
           }
           hspPublisher_.publishNavSatFix(navSatFixPub_, stamp, gnssFrame_, pkt);
@@ -297,7 +265,7 @@ class HokuyoSpelRosNode : public rclcpp::Node {
         } else if (datatype == spnet::DataType::GPGGA) {
           spnet::GpggaPacket pkt;
           if (!hspParser_.parseGpggaPayload(pl, pkt)) {
-            RCLCPP_ERROR(this->get_logger(), "Failed to parse GPGGA payload.");
+            ROS_ERROR( "Failed to parse GPGGA payload.");
             continue;
           }
           hspPublisher_.publishGpgga(gpggaPub_, stamp, gnssFrame_, pkt);
@@ -305,7 +273,7 @@ class HokuyoSpelRosNode : public rclcpp::Node {
         } else if (datatype == spnet::DataType::GPRMC) {
           spnet::GprmcPacket pkt;
           if (!hspParser_.parseGprmcPayload(pl, pkt)) {
-            RCLCPP_ERROR(this->get_logger(), "Failed to parse GPRMC payload.");
+            ROS_ERROR( "Failed to parse GPRMC payload.");
             continue;
           }
           hspPublisher_.publishGprmc(gprmcPub_, stamp, gnssFrame_, pkt);
@@ -313,7 +281,7 @@ class HokuyoSpelRosNode : public rclcpp::Node {
         } else if (datatype == spnet::DataType::GPZDA) {
           spnet::GpzdaPacket pkt;
           if (!hspParser_.parseGpzdaPayload(pl, pkt)) {
-            RCLCPP_ERROR(this->get_logger(), "Failed to parse GPZDA payload.");
+            ROS_ERROR( "Failed to parse GPZDA payload.");
             continue;
           }
           hspPublisher_.publishGpzda(gpzdaPub_, stamp, gnssFrame_, pkt);
@@ -322,7 +290,7 @@ class HokuyoSpelRosNode : public rclcpp::Node {
           spnet::PointCloudPacketHeader pcHdr{};
           const spnet::PointXYZIT* points = nullptr;
           if (!hspParser_.parseHokuyoCloud2Payload(pl, pcHdr, points)) {
-            RCLCPP_ERROR(this->get_logger(), "Failed to parse hokuyo cloud2 payload.");
+            ROS_ERROR( "Failed to parse hokuyo cloud2 payload.");
             continue;
           }
           hspPublisher_.publishHokuyoCloud2(hokuyoCloud2Pub_, stamp, lidarFrame_, pcHdr, points);
@@ -332,7 +300,7 @@ class HokuyoSpelRosNode : public rclcpp::Node {
         } else if (datatype == spnet::DataType::IMU) {
           spnet::ImuPacket pkt;
           if (!hspParser_.parseImuPayload(pl, pkt)) {
-            RCLCPP_ERROR(this->get_logger(), "Failed to parse IMU payload.");
+            ROS_ERROR( "Failed to parse IMU payload.");
             continue;
           }
           hspPublisher_.publishImu(imuPub_, stamp, imuFrame_, pkt);
@@ -340,7 +308,7 @@ class HokuyoSpelRosNode : public rclcpp::Node {
         } else if (datatype == spnet::DataType::IMU_RATE_ODOMETRY) {
           spnet::OdomPacket pkt;
           if (!hspParser_.parseOdomPayload(pl, pkt)) {
-            RCLCPP_ERROR(this->get_logger(), "Failed to parse IMU rate odometry payload.");
+            ROS_ERROR( "Failed to parse IMU rate odometry payload.");
             continue;
           }
           hspPublisher_.publishOdom(imuRateOdomPub_, stamp, odomFrame_, lidarFrame_, pkt);
@@ -357,7 +325,7 @@ class HokuyoSpelRosNode : public rclcpp::Node {
         } else if (datatype == spnet::DataType::NAV_SAT_FIX_SWITCH) {
           spnet::NavSatFixPacket pkt;
           if (!hspParser_.parseNavSatFixPayload(pl, pkt)) {
-            RCLCPP_ERROR(this->get_logger(), "Failed to parse NavSatFixSwitch payload.");
+            ROS_ERROR( "Failed to parse NavSatFixSwitch payload.");
             continue;
           }
           hspPublisher_.publishNavSatFix(navSatFixSwitchPub_, stamp, gnssFrame_, pkt);
@@ -365,7 +333,7 @@ class HokuyoSpelRosNode : public rclcpp::Node {
         } else if (datatype == spnet::DataType::UTM_ODOM) {
           spnet::OdomPacket pkt;
           if (!hspParser_.parseOdomPayload(pl, pkt)) {
-            RCLCPP_ERROR(this->get_logger(), "Failed to parse UTM odometry payload.");
+            ROS_ERROR( "Failed to parse UTM odometry payload.");
             continue;
           }
           hspPublisher_.publishOdom(utmOdomPub_, stamp, utmFrame_, lidarFrame_, pkt);
@@ -373,7 +341,7 @@ class HokuyoSpelRosNode : public rclcpp::Node {
         } else if (datatype == spnet::DataType::SWITCH_ODOM) {
           spnet::OdomPacket pkt;
           if (!hspParser_.parseOdomPayload(pl, pkt)) {
-            RCLCPP_ERROR(this->get_logger(), "Failed to parse switch odometry payload.");
+            ROS_ERROR( "Failed to parse switch odometry payload.");
             continue;
           }
           hspPublisher_.publishOdom(switchOdomPub_, stamp, odomFrame_, lidarFrame_, pkt);
@@ -381,7 +349,7 @@ class HokuyoSpelRosNode : public rclcpp::Node {
         } else if (datatype == spnet::DataType::SWITCH_ODOM_STATE) {
           std::string str;
           if (!hspParser_.parseStringPayload(pl, str)) {
-            RCLCPP_ERROR(this->get_logger(), "Failed to parse switch odometry state payload.");
+            ROS_ERROR( "Failed to parse switch odometry state payload.");
             continue;
           }
           hspPublisher_.publishString(switchOdomStatePub_, str);
@@ -389,7 +357,7 @@ class HokuyoSpelRosNode : public rclcpp::Node {
         } else if (datatype == spnet::DataType::SWITCH_ODOM_TYPE) {
           std::string str;
           if (!hspParser_.parseStringPayload(pl, str)) {
-            RCLCPP_ERROR(this->get_logger(), "Failed to parse switch odometry type payload.");
+            ROS_ERROR( "Failed to parse switch odometry type payload.");
             continue;
           }
           hspPublisher_.publishString(switchOdomTypePub_, str);
@@ -397,7 +365,7 @@ class HokuyoSpelRosNode : public rclcpp::Node {
         } else if (datatype == spnet::DataType::SWITCH_FIX_STATE) {
           std::string str;
           if (!hspParser_.parseStringPayload(pl, str)) {
-            RCLCPP_ERROR(this->get_logger(), "Failed to parse switch fix state payload.");
+            ROS_ERROR( "Failed to parse switch fix state payload.");
             continue;
           }
           hspPublisher_.publishString(switchFixStatePub_, str);
@@ -405,7 +373,7 @@ class HokuyoSpelRosNode : public rclcpp::Node {
         } else if (datatype == spnet::DataType::SWITCH_FIX_TYPE) {
           std::string str;
           if (!hspParser_.parseStringPayload(pl, str)) {
-            RCLCPP_ERROR(this->get_logger(), "Failed to parse switch fix type payload.");
+            ROS_ERROR( "Failed to parse switch fix type payload.");
             continue;
           }
           hspPublisher_.publishString(switchFixTypePub_, str);
@@ -413,7 +381,7 @@ class HokuyoSpelRosNode : public rclcpp::Node {
         } else if (datatype == spnet::DataType::DIAGNOSTIC_ARRAY) {
           spnet::DiagnosticPacket pkt;
           if (!hspParser_.parseDiagnosticsPayload(pl, pkt)) {
-            RCLCPP_ERROR(this->get_logger(), "Failed to parse diagnostics payload.");
+            ROS_ERROR( "Failed to parse diagnostics payload.");
             continue;
           }
           hspPublisher_.publishDiagnostics(diagnosticsPub_, stamp, pkt);
@@ -441,7 +409,7 @@ class HokuyoSpelRosNode : public rclcpp::Node {
 
     uint8_t type    = static_cast<uint8_t>(spnet::MsgType::CMD);
     uint8_t subtype = static_cast<uint8_t>(spnet::CmdType::START_STREAMING);
-    uint64_t stamp  = this->now().nanoseconds();
+    uint64_t stamp  = ros::Time::now().toNSec();
     uint32_t sec    = static_cast<uint32_t>(stamp / 1000000000ULL);
     uint32_t nsec   = static_cast<uint32_t>(stamp % 1000000000ULL);
     payload.clear();
@@ -450,10 +418,10 @@ class HokuyoSpelRosNode : public rclcpp::Node {
     subtype = static_cast<uint8_t>(spnet::CmdType::START_RSF);
     spnet::sendFrame(sock, type, subtype, sec, nsec, seq, payload.data(), payloadSize);
 
-    while (run.load() && rclcpp::ok()) {
+    while (run.load() && ros::ok()) {
       std::this_thread::sleep_for(1s);
 
-      std_msgs::msg::UInt8 cmdToSpel;
+      std_msgs::UInt8 cmdToSpel;
       uint64_t cmdToSpelStamp = 0;
       bool cmdToSpelUpdated = false;
       {
@@ -470,28 +438,28 @@ class HokuyoSpelRosNode : public rclcpp::Node {
         uint8_t subtype;
         if (cmdToSpel.data == 1) {
           subtype = static_cast<uint8_t>(spnet::CmdType::START_STREAMING);
-          RCLCPP_INFO(this->get_logger(),
-            "Hokuyo SPEL ROS2 node sends start streaming command.");
+          ROS_INFO(
+            "Hokuyo SPEL ROS1 node sends start streaming command.");
         } else if (cmdToSpel.data == 2) {
           subtype = static_cast<uint8_t>(spnet::CmdType::STOP_STREAMING);
-          RCLCPP_INFO(this->get_logger(),
-            "Hokuyo SPEL ROS2 node sends stop streaming command.");
+          ROS_INFO(
+            "Hokuyo SPEL ROS1 node sends stop streaming command.");
         } else if (cmdToSpel.data == 3) {
           subtype = static_cast<uint8_t>(spnet::CmdType::START_RSF);
-          RCLCPP_INFO(this->get_logger(),
-            "Hokuyo SPEL ROS2 node sends start software command.");
+          ROS_INFO(
+            "Hokuyo SPEL ROS1 node sends start software command.");
         } else if (cmdToSpel.data == 4) {
           subtype = static_cast<uint8_t>(spnet::CmdType::STOP_RSF);
-          RCLCPP_INFO(this->get_logger(),
-            "Hokuyo SPEL ROS2 node sends stop software command.");
+          ROS_INFO(
+            "Hokuyo SPEL ROS1 node sends stop software command.");
         } else if (cmdToSpel.data == 5) {
           subtype = static_cast<uint8_t>(spnet::CmdType::RESET_RSF);
-          RCLCPP_INFO(this->get_logger(),
-            "Hokuyo SPEL ROS2 node sends reset software command.");
+          ROS_INFO(
+            "Hokuyo SPEL ROS1 node sends reset software command.");
         } else {
           subtype = 0;
-          RCLCPP_WARN(this->get_logger(),
-            "Hokuyo SPEL ROS2 node sends unknown command.");
+          ROS_WARN(
+            "Hokuyo SPEL ROS1 node sends unknown command.");
         }
         const uint32_t sec = static_cast<uint32_t>(cmdToSpelStamp / 1000000000ULL);
         const uint32_t nsec = static_cast<uint32_t>(cmdToSpelStamp % 1000000000ULL);
@@ -500,13 +468,13 @@ class HokuyoSpelRosNode : public rclcpp::Node {
         if (!spnet::sendFrame(sock, type, subtype, sec, nsec, seq,
           payload.data(), payloadSize))
         {
-          RCLCPP_ERROR(this->get_logger(), "Failed to send a command to SPEL.");
+          ROS_ERROR( "Failed to send a command to SPEL.");
           run.store(false);
           break;
         }
       }
 
-      std_msgs::msg::String ipAddress;
+      std_msgs::String ipAddress;
       uint64_t ipAddressStamp = 0;
       bool ipAddressUpdated = false;
       {
@@ -521,8 +489,8 @@ class HokuyoSpelRosNode : public rclcpp::Node {
       if (ipAddressUpdated) {
         uint32_t ip;
         if (!spnet::Ipv4StringToUint32(ipAddress.data, ip)) {
-          RCLCPP_INFO(this->get_logger(),
-            "Hokuyo SPEL ROS2 node receives incorrect IP address: %s", ipAddress.data.c_str());
+          ROS_INFO(
+            "Hokuyo SPEL ROS1 node receives incorrect IP address: %s", ipAddress.data.c_str());
         } else {
           const uint8_t type = static_cast<uint8_t>(spnet::MsgType::CMD);
           const uint8_t subtype = static_cast<uint8_t>(spnet::CmdType::SET_IP_ADDRESS);
@@ -531,12 +499,12 @@ class HokuyoSpelRosNode : public rclcpp::Node {
           payload.resize(ipAddress.data.size());
           std::memcpy(payload.data(), ipAddress.data.data(), ipAddress.data.size());
           payloadSize = payload.size();
-          RCLCPP_INFO(this->get_logger(),
-            "Hokuyo SPEL ROS2 node sends IP address: %s", ipAddress.data.c_str());
+          ROS_INFO(
+            "Hokuyo SPEL ROS1 node sends IP address: %s", ipAddress.data.c_str());
           if (!spnet::sendFrame(sock, type, subtype, sec, nsec, seq,
             payload.data(), payloadSize))
           {
-            RCLCPP_ERROR(this->get_logger(), "Failed to send IP address.");
+            ROS_ERROR( "Failed to send IP address.");
             run.store(false);
             break;
           }
@@ -556,7 +524,7 @@ class HokuyoSpelRosNode : public rclcpp::Node {
 
     uint8_t type    = static_cast<uint8_t>(spnet::MsgType::CMD);
     uint8_t subtype = static_cast<uint8_t>(spnet::CmdType::STOP_RSF);
-    uint64_t stamp  = this->now().nanoseconds();
+    uint64_t stamp  = ros::Time::now().toNSec();
     uint32_t sec    = static_cast<uint32_t>(stamp / 1000000000ULL);
     uint32_t nsec   = static_cast<uint32_t>(stamp % 1000000000ULL);
     payload.clear();
@@ -564,7 +532,7 @@ class HokuyoSpelRosNode : public rclcpp::Node {
     spnet::sendFrame(sock, type, subtype, sec, nsec, seq, payload.data(), payloadSize);
     subtype = static_cast<uint8_t>(spnet::CmdType::STOP_STREAMING);
     spnet::sendFrame(sock, type, subtype, sec, nsec, seq, payload.data(), payloadSize);
-    RCLCPP_INFO(this->get_logger(), "Close RSF connection.");
+    ROS_INFO( "Close RSF connection.");
   }
 
   int sock_;
@@ -584,30 +552,30 @@ class HokuyoSpelRosNode : public rclcpp::Node {
 
   mutable std::mutex mutex_;
 
-  rclcpp::Subscription<std_msgs::msg::UInt8>::SharedPtr cmdToSpelSub_;
-  std_msgs::msg::UInt8 cmdToSpel_{};
+  ros::Subscriber cmdToSpelSub_;
+  std_msgs::UInt8 cmdToSpel_{};
   uint64_t cmdToSpelStamp_{0};
 
-  rclcpp::Subscription<std_msgs::msg::String>::SharedPtr ipAddressSub_;
-  std_msgs::msg::String ipAddress_{};
+  ros::Subscriber ipAddressSub_;
+  std_msgs::String ipAddress_{};
   uint64_t ipAddressStamp_{0};
 
-  rclcpp::Publisher<sensor_msgs::msg::NavSatFix>::SharedPtr navSatFixPub_;
-  rclcpp::Publisher<nmea_msgs::msg::Gpgga>::SharedPtr gpggaPub_;
-  rclcpp::Publisher<nmea_msgs::msg::Gprmc>::SharedPtr gprmcPub_;
-  rclcpp::Publisher<nmea_msgs::msg::Gpzda>::SharedPtr gpzdaPub_;
-  rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr hokuyoCloud2Pub_;
-  rclcpp::Publisher<sensor_msgs::msg::Imu>::SharedPtr imuPub_;
-  rclcpp::Publisher<nav_msgs::msg::Odometry>::SharedPtr imuRateOdomPub_;
-  rclcpp::Publisher<nav_msgs::msg::Odometry>::SharedPtr lidarRateOdomPub_;
-  rclcpp::Publisher<sensor_msgs::msg::NavSatFix>::SharedPtr navSatFixSwitchPub_;
-  rclcpp::Publisher<nav_msgs::msg::Odometry>::SharedPtr utmOdomPub_;
-  rclcpp::Publisher<nav_msgs::msg::Odometry>::SharedPtr switchOdomPub_;
-  rclcpp::Publisher<std_msgs::msg::String>::SharedPtr switchOdomStatePub_;
-  rclcpp::Publisher<std_msgs::msg::String>::SharedPtr switchOdomTypePub_;
-  rclcpp::Publisher<std_msgs::msg::String>::SharedPtr switchFixStatePub_;
-  rclcpp::Publisher<std_msgs::msg::String>::SharedPtr switchFixTypePub_;
-  rclcpp::Publisher<diagnostic_msgs::msg::DiagnosticArray>::SharedPtr diagnosticsPub_;
+  ros::Publisher navSatFixPub_;
+  ros::Publisher gpggaPub_;
+  ros::Publisher gprmcPub_;
+  ros::Publisher gpzdaPub_;
+  ros::Publisher hokuyoCloud2Pub_;
+  ros::Publisher imuPub_;
+  ros::Publisher imuRateOdomPub_;
+  ros::Publisher lidarRateOdomPub_;
+  ros::Publisher navSatFixSwitchPub_;
+  ros::Publisher utmOdomPub_;
+  ros::Publisher switchOdomPub_;
+  ros::Publisher switchOdomStatePub_;
+  ros::Publisher switchOdomTypePub_;
+  ros::Publisher switchFixStatePub_;
+  ros::Publisher switchFixTypePub_;
+  ros::Publisher diagnosticsPub_;
 
   bool broadcastTf_{true};
   std::string odomFrame_;
@@ -616,11 +584,14 @@ class HokuyoSpelRosNode : public rclcpp::Node {
   std::string gnssFrame_;
   std::string utmFrame_;
   std::shared_ptr<tf2_ros::TransformBroadcaster> tfBroadcaster_;
+  ros::NodeHandle nh_;
+  ros::NodeHandle pnh_;
 }; // class HokuyoSpelRosNode
 
 int main(int argc, char** argv) {
-  rclcpp::init(argc, argv);
-  rclcpp::spin(std::make_shared<HokuyoSpelRosNode>());
-  rclcpp::shutdown();
+  ros::init(argc, argv, "hokuyo_rsf");
+  HokuyoSpelRosNode node;
+  ros::spin();
+  ros::shutdown();
   return 0;
 }

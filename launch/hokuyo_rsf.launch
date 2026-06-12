@@ -1,0 +1,5 @@
+<launch>
+  <node pkg="hokuyo_rsf" type="hokuyo_rsf" name="hokuyo_rsf" output="screen">
+    <rosparam command="load" file="$(find hokuyo_rsf)/config/hokuyo_rsf.yaml" />
+  </node>
+</launch>

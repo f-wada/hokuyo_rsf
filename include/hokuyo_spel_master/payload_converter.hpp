@@ -14,17 +14,17 @@
 
 #pragma once
 
-#include <std_msgs/msg/string.hpp>
-#include <nav_msgs/msg/odometry.hpp>
-#include <sensor_msgs/msg/point_cloud2.hpp>
-#include <sensor_msgs/msg/imu.hpp>
-#include <sensor_msgs/msg/nav_sat_fix.hpp>
-#include <nmea_msgs/msg/gpgga.hpp>
-#include <nmea_msgs/msg/gprmc.hpp>
-#include <nmea_msgs/msg/gpzda.hpp>
-#include <diagnostic_msgs/msg/diagnostic_array.hpp>
-#include <diagnostic_msgs/msg/diagnostic_status.hpp>
-#include <diagnostic_msgs/msg/key_value.hpp>
+#include <std_msgs/String.h>
+#include <nav_msgs/Odometry.h>
+#include <sensor_msgs/PointCloud2.h>
+#include <sensor_msgs/Imu.h>
+#include <sensor_msgs/NavSatFix.h>
+#include <nmea_msgs/Gpgga.h>
+#include <nmea_msgs/Gprmc.h>
+#include <nmea_msgs/Gpzda.h>
+#include <diagnostic_msgs/DiagnosticArray.h>
+#include <diagnostic_msgs/DiagnosticStatus.h>
+#include <diagnostic_msgs/KeyValue.h>
 
 #include <arpa/inet.h>
 #include <iostream>
@@ -49,39 +49,39 @@ class PayloadConverter {
   ~PayloadConverter();
 
   void odomToPayload(
-    const nav_msgs::msg::Odometry& odom,
+    const nav_msgs::Odometry& odom,
     std::vector<uint8_t>& pl);
 
   void hokuyoCloud2ToPayload(
-    const sensor_msgs::msg::PointCloud2& cloud,
+    const sensor_msgs::PointCloud2& cloud,
     std::vector<uint8_t>& pl);
 
   void imuToPayload(
-    const sensor_msgs::msg::Imu& imu,
+    const sensor_msgs::Imu& imu,
     std::vector<uint8_t>& pl);
 
   void navSatFixToPayload(
-    const sensor_msgs::msg::NavSatFix& msg,
+    const sensor_msgs::NavSatFix& msg,
     std::vector<uint8_t>& pl);
 
   void gpggaToPayload(
-    const nmea_msgs::msg::Gpgga& msg,
+    const nmea_msgs::Gpgga& msg,
     std::vector<uint8_t>& pl);
 
   void gprmcToPayload(
-    const nmea_msgs::msg::Gprmc& msg,
+    const nmea_msgs::Gprmc& msg,
     std::vector<uint8_t>& pl);
 
   void gpzdaToPayload(
-    const nmea_msgs::msg::Gpzda& gpzda,
+    const nmea_msgs::Gpzda& gpzda,
     std::vector<uint8_t>& pl);
 
   void stringToPayload(
-    const std_msgs::msg::String& msg,
+    const std_msgs::String& msg,
     std::vector<uint8_t>& pl);
 
   void diagnosticsToPayload(
-    const diagnostic_msgs::msg::DiagnosticArray& diag,
+    const diagnostic_msgs::DiagnosticArray& diag,
     std::vector<uint8_t>& pl,
     const std::string& target_status_name);
 
@@ -149,7 +149,7 @@ class PayloadConverter {
   }
 
   static inline std::unordered_map<std::string, std::string>
-  ToMap(const diagnostic_msgs::msg::DiagnosticStatus& st) {
+  ToMap(const diagnostic_msgs::DiagnosticStatus& st) {
     std::unordered_map<std::string, std::string> m;
     m.reserve(st.values.size());
     for (const auto& kv : st.values) {
