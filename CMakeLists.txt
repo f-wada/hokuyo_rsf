@@ -1,104 +1,78 @@
-cmake_minimum_required(VERSION 3.8)
+cmake_minimum_required(VERSION 3.0.2)
 project(hokuyo_rsf)
 
-if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
-  add_compile_options(-Wall -Wextra -Wpedantic -O2)
-endif()
+add_compile_options(-Wall -Wextra -Wpedantic -O2)
 
-# find dependencies
-find_package(ament_cmake REQUIRED)
-find_package(rclcpp REQUIRED)
-find_package(rclpy REQUIRED)
-find_package(std_msgs REQUIRED)
-find_package(sensor_msgs REQUIRED)
-find_package(geometry_msgs REQUIRED)
-find_package(nav_msgs REQUIRED)
-find_package(nmea_msgs REQUIRED)
-find_package(diagnostic_msgs REQUIRED)
-find_package(pcl_msgs REQUIRED)
-find_package(pcl_ros REQUIRED)
-find_package(tf2_msgs REQUIRED)
-find_package(tf2_ros REQUIRED)
-find_package(tf2_eigen REQUIRED)
-find_package(pcl_conversions REQUIRED)
-find_package(rosidl_typesupport_cpp REQUIRED)
+find_package(catkin REQUIRED COMPONENTS
+  roscpp
+  std_msgs
+  sensor_msgs
+  geometry_msgs
+  nav_msgs
+  nmea_msgs
+  diagnostic_msgs
+  tf2_ros
+  tf2_geometry_msgs
+)
 
-# hokuyo_rsf
+catkin_package(
+  INCLUDE_DIRS include
+  CATKIN_DEPENDS
+    roscpp
+    std_msgs
+    sensor_msgs
+    geometry_msgs
+    nav_msgs
+    nmea_msgs
+    diagnostic_msgs
+    tf2_ros
+    tf2_geometry_msgs
+)
+
+include_directories(
+  include
+  ${catkin_INCLUDE_DIRS}
+)
+
 add_executable(hokuyo_rsf
   src/hokuyo_rsf.cpp
   src/payload_converter.cpp
   src/spel_parser.cpp
-  src/spel_publisher.cpp)
-
-target_include_directories(hokuyo_rsf PUBLIC
-  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
-  $<INSTALL_INTERFACE:include>)
-
-target_compile_features(hokuyo_rsf PUBLIC c_std_99 cxx_std_17)
-
-ament_target_dependencies(hokuyo_rsf
-  "rclcpp"
-  "rclpy"
-  "std_msgs"
-  "sensor_msgs"
-  "geometry_msgs"
-  "nav_msgs"
-  "nmea_msgs"
-  "diagnostic_msgs"
-  "tf2_msgs"
-  "tf2_ros"
-  "tf2_eigen"
-  "tf2_geometry_msgs"
-  "rosidl_typesupport_cpp"
+  src/spel_publisher.cpp
 )
-
-install(TARGETS hokuyo_rsf DESTINATION lib/${PROJECT_NAME})
-
-# send_uint8_command
-add_executable(send_uint8_command
-  src/send_uint8_command.cpp)
-
-target_include_directories(send_uint8_command PUBLIC
-  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
-  $<INSTALL_INTERFACE:include>)
-
-target_compile_features(send_uint8_command PUBLIC c_std_99 cxx_std_17)
-
-ament_target_dependencies(send_uint8_command
-  "rclcpp"
-  "std_msgs")
-
-install(TARGETS send_uint8_command
-  DESTINATION lib/${PROJECT_NAME})
-
-# spel_diagnostics_publisher
-add_executable(spel_diagnostics_publisher
-  src/spel_diagnostics_publisher.cpp)
-
-target_include_directories(spel_diagnostics_publisher PUBLIC
-  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
-  $<INSTALL_INTERFACE:include>)
-
-target_compile_features(spel_diagnostics_publisher PUBLIC c_std_99 cxx_std_17)
-
-ament_target_dependencies(spel_diagnostics_publisher
-  "rclcpp"
-  "std_msgs"
-  "diagnostic_msgs")
-
-install(TARGETS spel_diagnostics_publisher
-  DESTINATION lib/${PROJECT_NAME})
-
-if(BUILD_TESTING)
-  find_package(ament_lint_auto REQUIRED)
-  set(ament_cmake_copyright_FOUND TRUE)
-  set(ament_cmake_cpplint_FOUND TRUE)
-  ament_lint_auto_find_test_dependencies()
+target_compile_features(hokuyo_rsf PUBLIC cxx_std_17)
+target_link_libraries(hokuyo_rsf ${catkin_LIBRARIES})
+if(catkin_EXPORTED_TARGETS)
+  add_dependencies(hokuyo_rsf ${catkin_EXPORTED_TARGETS})
 endif()
 
-install(
-  DIRECTORY launch config
-  DESTINATION share/${PROJECT_NAME}/
+add_executable(send_uint8_command
+  src/send_uint8_command.cpp
+)
+target_compile_features(send_uint8_command PUBLIC cxx_std_17)
+target_link_libraries(send_uint8_command ${catkin_LIBRARIES})
+if(catkin_EXPORTED_TARGETS)
+  add_dependencies(send_uint8_command ${catkin_EXPORTED_TARGETS})
+endif()
+
+add_executable(spel_diagnostics_publisher
+  src/spel_diagnostics_publisher.cpp
+)
+target_compile_features(spel_diagnostics_publisher PUBLIC cxx_std_17)
+target_link_libraries(spel_diagnostics_publisher ${catkin_LIBRARIES})
+if(catkin_EXPORTED_TARGETS)
+  add_dependencies(spel_diagnostics_publisher ${catkin_EXPORTED_TARGETS})
+endif()
+
+install(TARGETS hokuyo_rsf send_uint8_command spel_diagnostics_publisher
+  RUNTIME DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
 )
 
-ament_package()
+install(DIRECTORY include/
+  DESTINATION ${CATKIN_GLOBAL_INCLUDE_DESTINATION}
+  FILES_MATCHING PATTERN "*.hpp"
+)
+
+install(DIRECTORY launch config
+  DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION}
+)

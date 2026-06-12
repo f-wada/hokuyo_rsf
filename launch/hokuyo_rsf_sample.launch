@@ -1,0 +1,4 @@
+<launch>
+  <include file="$(find hokuyo_rsf)/launch/hokuyo_rsf.launch" />
+  <node pkg="rviz" type="rviz" name="rviz" args="-d $(find hokuyo_rsf)/config/rviz.rviz" output="screen" />
+</launch>

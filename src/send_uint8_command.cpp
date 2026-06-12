@@ -12,59 +12,51 @@
  * without written permission from LOCT Co., Ltd.
  */
 
-#include <rclcpp/rclcpp.hpp>
-#include <std_msgs/msg/u_int8.hpp>
+#include <ros/ros.h>
+#include <std_msgs/UInt8.h>
 
-#include <chrono>
-#include <string>
 #include <cstdlib>
+#include <iostream>
+#include <string>
 
 int main(int argc, char** argv)
 {
-  rclcpp::init(argc, argv);
+  ros::init(argc, argv, "send_uint8");
 
   // argv[1] = uint8 value
   if (argc < 2) {
-    std::cerr << "Usage: ros2 run hokuyo_spel_master send_uint8 <0-255>\n"
-              << "Example: ros2 run hokuyo_spel_master send_uint8 1\n";
-    rclcpp::shutdown();
+    std::cerr << "Usage: rosrun hokuyo_rsf send_uint8_command <0-255>\n"
+              << "Example: rosrun hokuyo_rsf send_uint8_command 1\n";
     return 1;
   }
 
   int value = std::atoi(argv[1]);
   if (value < 0 || value > 255) {
     std::cerr << "Value must be in range [0, 255]\n";
-    rclcpp::shutdown();
     return 1;
   }
 
-  auto node = std::make_shared<rclcpp::Node>("send_uint8");
+  ros::NodeHandle nh;
+  ros::NodeHandle pnh("~");
 
   // Topic parameter (合わせやすいように param 化)
-  node->declare_parameter<std::string>("topic", "/spel/cmd_to_spel");
   std::string topic;
-  node->get_parameter("topic", topic);
+  pnh.param<std::string>("topic", topic, "/spel/cmd_to_spel");
 
-  rclcpp::QoS cmdQos(rclcpp::KeepLast(10));
-  cmdQos.reliable();
-  cmdQos.transient_local();
-  auto pub = node->create_publisher<std_msgs::msg::UInt8>(topic, cmdQos);
+  ros::Publisher pub = nh.advertise<std_msgs::UInt8>(topic, 10, true);
 
-  // Wait for DDS matching
-  rclcpp::sleep_for(std::chrono::milliseconds(200));
+  // Wait for publisher setup and subscriber connection.
+  ros::Duration(0.2).sleep();
 
-  std_msgs::msg::UInt8 msg;
+  std_msgs::UInt8 msg;
   msg.data = static_cast<uint8_t>(value);
-  pub->publish(msg);
+  pub.publish(msg);
 
   // Flush
-  rclcpp::spin_some(node);
-  rclcpp::sleep_for(std::chrono::milliseconds(200));
+  ros::spinOnce();
+  ros::Duration(0.2).sleep();
 
-  RCLCPP_INFO(node->get_logger(),
-              "Published UInt8 value %u on topic '%s'",
-              msg.data, topic.c_str());
+  ROS_INFO("Published UInt8 value %u on topic '%s'", msg.data, topic.c_str());
 
-  rclcpp::shutdown();
   return 0;
 }
