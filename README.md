@@ -10,11 +10,8 @@ cd ~/catkin_ws/src
 git clone https://github.com/Hokuyo-aut/hokuyo_rsf.git
 cd ~/catkin_ws
 
-# nmea_msgs/Gpzda が必要です。配布パッケージに含まれない場合は、Gpzda を含む nmea_msgs を src に追加してください。
-# 例:
-# cd ~/catkin_ws/src
-# git clone https://github.com/hokuyo-rd-release/nmea_msgs.git
-# cd ~/catkin_ws
+# GPZDA は hokuyo_rsf/Gpzda としてこのパッケージ内で生成されます。
+# nmea_msgs 側に Gpzda が含まれていない環境でも追加の nmea_msgs checkout は不要です。
 
 rosdep install --from-paths src --ignore-src -r -y
 catkin_build hokuyo_rsf

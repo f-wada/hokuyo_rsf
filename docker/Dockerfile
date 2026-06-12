@@ -20,7 +20,6 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # ワークスペース構築
 WORKDIR /ws/src
 COPY . /ws/src/hokuyo_rsf
-RUN git clone --depth 1 https://github.com/hokuyo-rd-release/nmea_msgs.git
 
 # 依存関係の解決とビルド
 WORKDIR /ws

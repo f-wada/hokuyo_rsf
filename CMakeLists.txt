@@ -13,6 +13,17 @@ find_package(catkin REQUIRED COMPONENTS
   diagnostic_msgs
   tf2_ros
   tf2_geometry_msgs
+  message_generation
+)
+
+add_message_files(
+  FILES
+  Gpzda.msg
+)
+
+generate_messages(
+  DEPENDENCIES
+  std_msgs
 )
 
 catkin_package(
@@ -27,6 +38,7 @@ catkin_package(
     diagnostic_msgs
     tf2_ros
     tf2_geometry_msgs
+    message_runtime
 )
 
 include_directories(
@@ -45,6 +57,7 @@ target_link_libraries(hokuyo_rsf ${catkin_LIBRARIES})
 if(catkin_EXPORTED_TARGETS)
   add_dependencies(hokuyo_rsf ${catkin_EXPORTED_TARGETS})
 endif()
+add_dependencies(hokuyo_rsf ${PROJECT_NAME}_generate_messages_cpp)
 
 add_executable(send_uint8_command
   src/send_uint8_command.cpp

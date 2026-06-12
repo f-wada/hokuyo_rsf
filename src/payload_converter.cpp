@@ -227,7 +227,7 @@ void PayloadConverter::gprmcToPayload(
 }
 
 void PayloadConverter::gpzdaToPayload(
-  const nmea_msgs::Gpzda& gpzda,
+  const GpzdaMsg& gpzda,
   std::vector<uint8_t>& pl)
 {
   spnet::GpzdaPacket pkt{};

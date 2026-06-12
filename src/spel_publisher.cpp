@@ -279,7 +279,7 @@ void HokuyoSpelPublisher::publishGpzda(
   const std::string& frame_id,
   const spnet::GpzdaPacket& pkt)
 {
-  nmea_msgs::Gpzda msg;
+  GpzdaMsg msg;
   msg.header.stamp = ros::Time(static_cast<uint32_t>(stamp / 1000000000ULL), static_cast<uint32_t>(stamp % 1000000000ULL));
   msg.header.frame_id = frame_id;
   msg.message_id = std::string(pkt.message_id, strnlen(pkt.message_id, sizeof(pkt.message_id)));

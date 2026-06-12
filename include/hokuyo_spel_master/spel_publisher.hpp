@@ -22,7 +22,7 @@
 #include <sensor_msgs/NavSatFix.h>
 #include <nmea_msgs/Gpgga.h>
 #include <nmea_msgs/Gprmc.h>
-#include <nmea_msgs/Gpzda.h>
+#include <hokuyo_spel_master/gpzda_msg.hpp>
 #include <geometry_msgs/TransformStamped.h>
 #include <tf2_ros/transform_broadcaster.h>
 #include <diagnostic_msgs/DiagnosticArray.h>
