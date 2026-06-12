@@ -22,7 +22,7 @@
 #include <sensor_msgs/NavSatFix.h>
 #include <nmea_msgs/Gpgga.h>
 #include <nmea_msgs/Gprmc.h>
-#include <nmea_msgs/Gpzda.h>
+#include <hokuyo_spel_master/gpzda_msg.hpp>
 #include <tf2/LinearMath/Quaternion.h>
 #include <tf2_geometry_msgs/tf2_geometry_msgs.h>
 #include <tf2_ros/transform_broadcaster.h>
@@ -82,7 +82,7 @@ class HokuyoSpelRosNode {
 
     std::string gpzdaTopic;
     pnh_.param<std::string>("gpzda_topic", gpzdaTopic, "/spel/gpzda");
-    gpzdaPub_ = nh_.advertise<nmea_msgs::Gpzda>(gpzdaTopic, 100);
+    gpzdaPub_ = nh_.advertise<hsp::GpzdaMsg>(gpzdaTopic, 100);
 
     std::string hokuyoCloud2Topic;
     pnh_.param<std::string>("hokuyo_cloud2_topic", hokuyoCloud2Topic, "/spel/hokuyo_cloud2");

@@ -21,7 +21,7 @@
 #include <sensor_msgs/NavSatFix.h>
 #include <nmea_msgs/Gpgga.h>
 #include <nmea_msgs/Gprmc.h>
-#include <nmea_msgs/Gpzda.h>
+#include <hokuyo_spel_master/gpzda_msg.hpp>
 #include <diagnostic_msgs/DiagnosticArray.h>
 #include <diagnostic_msgs/DiagnosticStatus.h>
 #include <diagnostic_msgs/KeyValue.h>
@@ -73,7 +73,7 @@ class PayloadConverter {
     std::vector<uint8_t>& pl);
 
   void gpzdaToPayload(
-    const nmea_msgs::Gpzda& gpzda,
+    const GpzdaMsg& gpzda,
     std::vector<uint8_t>& pl);
 
   void stringToPayload(
